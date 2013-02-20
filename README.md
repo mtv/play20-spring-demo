@@ -21,15 +21,18 @@ import PlayProject._
 object ApplicationBuild extends Build {
 
     val appName         = "play-spring"
-    val appVersion      = "1.0-SNAPSHOT"
+    val appVersion      = "1.0.0-SNAPSHOT" // Semantic Versioning - http://semver.org/
 
-    val appDependencies = Seq(
-      "org.springframework" % "spring-context" % "3.0.7.RELEASE"
-    )
+  val appDependencies = Seq(
+    javaCore,
 
-    val main = PlayProject(appName, appVersion, appDependencies, mainLang = JAVA).settings(
-      // Add your own project settings here      
-    )
+    // Spring dependency
+    "org.springframework" % "spring-context" % "3.2.1.RELEASE"
+  )
+
+  val main = play.Project(appName, appVersion, appDependencies).settings(
+    // Add your own project settings here      
+  )
 
 }
 ```
@@ -49,42 +52,51 @@ The controllers instances management will be delegated to the `Global` object of
 ```java
 import play.*;
 
-import org.springframework.context.*;
-import org.springframework.context.support.*;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.core.env.StandardEnvironment;
 
 public class Global extends GlobalSettings {
 
-	private ApplicationContext ctx;
+  private AnnotationConfigApplicationContext ctx;
 
-	@Override
-	public void onStart(Application app) {
-		ctx = new ClassPathXmlApplicationContext("components.xml");
-	}
+  @Override
+  public void onStart(Application app) {
+    ctx = new AnnotationConfigApplicationContext();
+    ctx.setEnvironment(new StandardEnvironment());
+    ctx.register(GlobalContext.class);
+    ctx.refresh();
+  }
 
-	@Override
-	public <A> A getControllerInstance(Class<A> clazz) {
-		return ctx.getBean(clazz);
-	}
+  @Override
+  public <T> T getControllerInstance(Class<T> clazz) {
+    return ctx.getBean(clazz);
+  }
 
 }
 ```
 
-And here is the associated `conf/components.xml` file we are using to configure Spring:
+And here is the associated `GlobalContext` object we are using to configure Spring:
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<beans xmlns="http://www.springframework.org/schema/beans"
-     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-     xmlns:context="http://www.springframework.org/schema/context"
-     xsi:schemaLocation="http://www.springframework.org/schema/beans
-         http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
-         http://www.springframework.org/schema/context
-         http://www.springframework.org/schema/context/spring-context-3.0.xsd">
+```java
+import services.*;
 
-   <context:component-scan base-package="controllers,services,dao"/>
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
 
-</beans>
+@Configuration
+@ComponentScan({ "controllers" })
+public class GlobalContext {
+  
+  @Bean
+  public HelloService helloService() {
+    return new HelloService();
+  }
+}
 ```
+
+Here we are using 2 different ways of finding Spring Beans. The first (like in the old) version we are using component scanning of packages. The second way, we are actually annotating the method that returns the Spring Bean.
 
 ### Creating Spring components
 
